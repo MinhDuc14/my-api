@@ -20,3 +20,7 @@ Route::get('/', function () {
 Route::get('/12', function () {
     dd(123);
 });
+
+Route::get('/test', function () {
+    dd("test push aws");
+});
