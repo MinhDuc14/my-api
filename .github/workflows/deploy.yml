@@ -1,0 +1,70 @@
+name: Laravel CI/CD Deploy
+
+# Kích hoạt workflow khi có push lên branch 'main'
+on:
+  push:
+    branches:
+      - main # Thay bằng tên branch chính của bạn nếu không phải là 'main' (ví dụ: 'master' hoặc tên branch triển khai của bạn)
+
+# Định nghĩa các jobs (công việc)
+jobs:
+  deploy:
+    runs-on: ubuntu-latest # Chạy job này trên một máy ảo Ubuntu mới nhất của GitHub
+
+    # Các bước trong job 'deploy'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4 # Action để clone code từ repository của bạn
+
+      - name: Set up PHP Environment
+        uses: shivammathur/setup-php@v2 # Action để cài đặt PHP và Composer
+        with:
+          php-version: '8.1' # Phiên bản PHP trên EC2 của bạn
+          extensions: mbstring, pdo_mysql, zip, gd # Các extension cần thiết cho Laravel (thêm gd nếu bạn dùng xử lý ảnh)
+          tools: composer # Cài đặt Composer
+          coverage: none # Không cần coverage cho bước này nếu bạn không chạy PHPUnit coverage
+
+      - name: Install Composer Dependencies
+        # Cài đặt dependencies, bỏ qua dev dependencies (--no-dev)
+        # Dùng --prefer-dist để cài đặt từ bản phân phối thay vì source
+        # --optimize-autoloader để tối ưu hóa autoloading cho production
+        run: composer install --no-dev --prefer-dist --optimize-autoloader
+
+      - name: Run Tests (Tùy chọn - Rất nên thêm vào cho CI)
+        # Nếu bạn có các bài kiểm thử (PHPUnit), hãy bỏ comment dòng dưới và cấu hình chúng ở đây.
+        # run: php artisan test
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master # Một GitHub Action phổ biến để kết nối SSH và chạy lệnh trên server
+        with:
+          host: ${{ secrets.SSH_HOST }} # Lấy host từ GitHub Secret (18.183.38.190)
+          username: ${{ secrets.SSH_USERNAME }} # Lấy username từ GitHub Secret (ubuntu)
+          key: ${{ secrets.SSH_PRIVATE_KEY }} # Lấy private key từ GitHub Secret
+          script: |
+            # Chuyển đến thư mục dự án Laravel trên server
+            cd /var/www/my-laravel-api
+
+            # Pull code mới nhất từ Git.
+            # Đảm bảo branch trên server (nếu bạn đã clone từ git trước đó) khớp với branch trên GitHub (ví dụ: 'main')
+            git pull origin main
+
+            # Chạy Composer install để cập nhật dependencies nếu composer.lock thay đổi
+            composer install --no-dev --prefer-dist --optimize-autoloader
+
+            # Chạy migrate database (sử dụng --force cho môi trường production để bỏ qua xác nhận)
+            php artisan migrate --force
+
+            # Xóa các loại cache của Laravel
+            php artisan cache:clear
+            php artisan config:clear
+            php artisan route:clear
+            php artisan view:clear
+
+            # Tối ưu hóa lại ứng dụng (tùy chọn, tạo các file cache config/route)
+            php artisan optimize
+
+            # Khởi động lại PHP-FPM để đảm bảo mọi thay đổi về code và cấu hình được áp dụng
+            # LƯU Ý: User SSH (ubuntu) cần có quyền sudo không mật khẩu cho lệnh này.
+            # Nếu không, bạn cần cấu hình sudoers hoặc bỏ qua dòng này.
+            # Việc này không bắt buộc sau mỗi lần pull nếu bạn chỉ thay đổi code logic.
+            sudo systemctl restart php8.1-fpm
