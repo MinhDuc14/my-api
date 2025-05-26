@@ -35,6 +35,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: | # Chú ý dấu gạch đứng (|) và nội dung script phải thụt vào
             cd /var/www/my-laravel-api
+             # THÊM HAI DÒNG NÀY ĐỂ ĐẢM BẢO GIT SẠCH TRƯỚC KHI PULL
+            git reset --hard HEAD  # Đặt lại tất cả các thay đổi chưa commit
+            git clean -fd          # Xóa tất cả các file và thư mục chưa được theo dõi
             git pull origin main
             composer install --no-dev --prefer-dist --optimize-autoloader
             php artisan migrate --force
