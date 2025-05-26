@@ -18,9 +18,16 @@ Route::get('/', function () {
 });
 
 Route::get('/12', function () {
-    dd(123);
+    return 123 ;
 });
 
 Route::get('/test', function () {
-    dd("test push aws");
+    return "test push aws";
 });
+Route::get('/test1', function () {
+    return "test1";
+});
+Route::get('/test2', function () {
+    return "test2";
+});
+
